@@ -9,12 +9,46 @@ async function bootstrap() {
     instrument: ObserveInstrument,
   });
 
-  app.use(helmet());
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:', 'https:'],
+      }, 
+    },
+    crossOriginEmbedderPolicy: false,
+    hsts: {
+      maxAge: 31536000,
+      includeSubDomains: true,
+      preload: true,
+    }
+  }));
 
   app.enableCors({
-    origin: process.env.CORS_ORIGIN || '*',
+    origin: (origin: string, callback: (err: Error | null, allowed?: boolean) => void) => {
+      if (!origin) return callback(null, true);
+
+      const allowedOrigins = process.env.CORS_ORIGINS?.split(',') || [];
+
+      if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error('Not allowed by CORS'));
+    },
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE'],
-    allowdHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Requested-With',
+      'Accept',
+      'Origin',
+      'Access-Control-Allow-Origin',
+    ],
+    credentials: true,
+    maxAge: 86400, // 24 hours
   });
 
   app.useGlobalPipes(
