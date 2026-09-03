@@ -3,6 +3,8 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { firstValueFrom } from 'rxjs';
 import { serviceConfig } from '../../config/gateway.config.js';
+import { LoginDTO } from '../dtos/login.dto.js';
+import { RegisterDTO } from '../dtos/register.dto.js';
 
 interface UserSession {
   valid: boolean;
@@ -13,6 +15,16 @@ interface UserSession {
     lastName: string;
     role: string;
     status: string;
+  }
+}
+
+export interface AuthResponse {
+  access_token: string;
+  user: {
+    email: string;
+    firstName: string;
+    lastName: string;
+    role: string;
   }
 }
 
@@ -43,10 +55,10 @@ export class AuthService {
     }
   }
 
-  async login(loginDto: { email: string; password: string }) {
+  async login(loginDto: LoginDTO): Promise<AuthResponse> {
     try {
       const { data } = await firstValueFrom(
-        this.httpService.post<{ sessionToken: string }>(`${serviceConfig.users.url}/login`, loginDto, {
+        this.httpService.post<AuthResponse>(`${serviceConfig.users.url}/login`, loginDto, {
           timeout: serviceConfig.users.timeout,
         })
       );
@@ -57,9 +69,9 @@ export class AuthService {
     }
   }
 
-  async register(register: any) {
+  async register(register: RegisterDTO): Promise<AuthResponse> {
     const { data } = await firstValueFrom(
-      this.httpService.post<{ sessionToken: string }>(`${serviceConfig.users.url}/register`, register, {
+      this.httpService.post<AuthResponse>(`${serviceConfig.users.url}/register`, register, {
         timeout: serviceConfig.users.timeout,
       })
     );

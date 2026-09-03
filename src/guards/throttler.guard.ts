@@ -3,7 +3,7 @@ import { ThrottlerException, ThrottlerGuard, ThrottlerRequest } from '@nestjs/th
 
 @Injectable()
 export class CustomThrottlerGuard extends ThrottlerGuard {
-  protected async getTracker(req: Record<string, any>): Promise<any> {
+  protected async getTracker(req: Record<string, any>): Promise<string> {
     return `${req.ip}-${req.headers['user-agent']}`;
   }
 

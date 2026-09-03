@@ -4,6 +4,14 @@ import { serviceConfig } from '../../config/gateway.config.js';
 import { errorContext } from 'rxjs/internal/util/errorContext';
 import { firstValueFrom } from 'rxjs';
 
+interface UserInfo {
+  userId: string;
+  email: string;
+  role: string;
+}
+
+type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+
 @Injectable()
 export class ProxyService {
   private readonly logger = new Logger(ProxyService.name);
@@ -12,11 +20,11 @@ export class ProxyService {
 
   async proxyRequest(
     serviceName: keyof typeof serviceConfig,
-    method: string,
+    method: HttpMethod,
     path: string,
     data?: any,
     headers?: Record<string, string>,
-    userInfo?: any
+    userInfo?: UserInfo
   ) {
     const service = serviceConfig[serviceName];
     const url = `${service.url}${path}`;
@@ -26,7 +34,7 @@ export class ProxyService {
     try {
       const enhancedHeaders = {
         ...headers,
-        'x-user-id': userInfo?.id,
+        'x-user-id': userInfo?.userId,
         'x-user-role': userInfo?.role,
         'x-user-email': userInfo?.email,
       }
