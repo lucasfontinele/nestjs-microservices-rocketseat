@@ -1,8 +1,8 @@
 import { HttpService } from '@nestjs/axios';
 import { Injectable, Logger } from '@nestjs/common';
 import { serviceConfig } from '../../config/gateway.config.js';
-import { errorContext } from 'rxjs/internal/util/errorContext';
 import { firstValueFrom } from 'rxjs';
+import { CircuitBreakerService } from '../../common/circuit-breaker/circuit-breaker.service.js';
 
 interface UserInfo {
   userId: string;
@@ -16,7 +16,10 @@ type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
 export class ProxyService {
   private readonly logger = new Logger(ProxyService.name);
 
-  constructor(private readonly httpService: HttpService) {}
+  constructor(
+    private readonly httpService: HttpService,
+    private readonly circuitBreakerService: CircuitBreakerService
+  ) {}
 
   async proxyRequest(
     serviceName: keyof typeof serviceConfig,
@@ -31,32 +34,36 @@ export class ProxyService {
 
     this.logger.log(`Proxying request to ${url} with method ${method}`);
 
-    try {
-      const enhancedHeaders = {
-        ...headers,
-        'x-user-id': userInfo?.userId,
-        'x-user-role': userInfo?.role,
-        'x-user-email': userInfo?.email,
+    return this.circuitBreakerService.executeWithCircuitBreaker(
+      async () => {
+        const enhancedHeaders = {
+          ...headers,
+          'x-user-id': userInfo?.userId,
+          'x-user-role': userInfo?.role,
+          'x-user-email': userInfo?.email,
+        };
+
+        const response = await firstValueFrom(
+          this.httpService.request({
+            method: method.toLowerCase() as any,
+            url,
+            data,
+            headers: enhancedHeaders,
+            timeout: service.timeout,
+          })
+        );
+
+        this.logger.log(`Successfully proxied request to ${url}`);
+
+        return response.data;
+      },
+      `${serviceName}:${method}:${path}`,
+      { failureThreshold: 3, timeout: 30000, resetTimeout: 30000 },
+      () => {
+        this.logger.error(`Fallback: Service ${serviceName} is currently unavailable. Returning fallback response.`);
+        throw new Error(`Service ${serviceName} is currently unavailable. Please try again later.`);
       }
-
-      const response = await firstValueFrom(
-        this.httpService.request({
-          method: method.toLowerCase() as any,
-          url,
-          data,
-          headers: enhancedHeaders,
-          timeout: service.timeout,
-        })
-      );
-
-      this.logger.log(`Successfully proxied request to ${url}`);
-
-      return response.data;
-    } catch {
-      this.logger.error(`Error proxying request to ${url}`);
-
-      throw errorContext;
-    }
+    );
   }
 
   async getServiceHealth(serviceName: keyof typeof serviceConfig) {
