@@ -50,32 +50,7 @@ export class ProxyService {
         return await this.retryService.executeWithExponentialBackoff(
           async () => {
             return await this.timeoutService.executeWithCustomTimeout(
-              async () => {
-                const enhancedHeaders = {
-                  ...headers,
-                  'x-user-id': userInfo?.userId,
-                  'x-user-role': userInfo?.role,
-                  'x-user-email': userInfo?.email,
-                };
-
-                const response = await firstValueFrom(
-                  this.httpService.request({
-                    method: method.toLowerCase() as any,
-                    url,
-                    data,
-                    headers: enhancedHeaders,
-                    timeout: service.timeout,
-                  })
-                );
-
-                if (method.toUpperCase() === "GET") {
-                  this.cacheFallbackService.setCachedData(`${serviceName}:${method}:${path}`, response.data);
-                }
-
-                this.logger.log(`Successfully proxied request to ${url}`);
-
-                return response.data;
-              },
+              async () => this.executeOperation(data, serviceName, method, path, headers, userInfo),
               service.timeout,
             );
           }
@@ -85,6 +60,43 @@ export class ProxyService {
       fallback,
       { failureThreshold: 3, timeout: 30000, resetTimeout: 30000 },
     );
+  }
+
+  private async executeOperation(
+    data: any,
+    serviceName: keyof typeof serviceConfig,
+    method: HttpMethod,
+    path: string,
+    headers?: Record<string, string>,
+    userInfo?: UserInfo,
+  ) {
+    const service = serviceConfig[serviceName];
+    const url = `${service.url}${path}`;
+
+    const enhancedHeaders = {
+      ...headers,
+      'x-user-id': userInfo?.userId,
+      'x-user-role': userInfo?.role,
+      'x-user-email': userInfo?.email,
+    };
+
+    const response = await firstValueFrom(
+      this.httpService.request({
+        method: method.toLowerCase() as any,
+        url,
+        data,
+        headers: enhancedHeaders,
+        timeout: service.timeout,
+      })
+    );
+
+    if (method.toUpperCase() === "GET") {
+      this.cacheFallbackService.setCachedData(`${serviceName}:${method}:${path}`, response.data);
+    }
+
+    this.logger.log(`Successfully proxied request to ${url}`);
+
+    return response.data;
   }
 
   async getServiceHealth(serviceName: keyof typeof serviceConfig) {
