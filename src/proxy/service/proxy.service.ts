@@ -1,10 +1,12 @@
 import { HttpService } from '@nestjs/axios';
 import { Injectable, Logger } from '@nestjs/common';
-import { serviceConfig } from '../../config/gateway.config.js';
 import { firstValueFrom } from 'rxjs';
 import { CircuitBreakerService } from '../../common/circuit-breaker/circuit-breaker.service.js';
 import { CacheFallbackService } from '../../common/fallback/cache.fallback.js';
 import { DefaultFallbackService } from '../../common/fallback/default.fallback.js';
+import { RetryService } from '../../common/retry/retry.service.js';
+import { TimeoutService } from '../../common/timeout/timeout.service.js';
+import { serviceConfig } from '../../config/gateway.config.js';
 
 interface UserInfo {
   userId: string;
@@ -22,7 +24,9 @@ export class ProxyService {
     private readonly httpService: HttpService,
     private readonly circuitBreakerService: CircuitBreakerService,
     private readonly cacheFallbackService: CacheFallbackService,
-    private readonly defaultFallbackService: DefaultFallbackService
+    private readonly defaultFallbackService: DefaultFallbackService,
+    private readonly timeoutService: TimeoutService,
+    private readonly retryService: RetryService,
   ) {}
 
   async proxyRequest(
@@ -40,32 +44,42 @@ export class ProxyService {
 
     const fallback = this.createServiceFallback(serviceName, method, path);
 
+    // Circuit Breaker layer
     return this.circuitBreakerService.executeWithCircuitBreaker(
       async () => {
-        const enhancedHeaders = {
-          ...headers,
-          'x-user-id': userInfo?.userId,
-          'x-user-role': userInfo?.role,
-          'x-user-email': userInfo?.email,
-        };
+        return await this.retryService.executeWithExponentialBackoff(
+          async () => {
+            return await this.timeoutService.executeWithCustomTimeout(
+              async () => {
+                const enhancedHeaders = {
+                  ...headers,
+                  'x-user-id': userInfo?.userId,
+                  'x-user-role': userInfo?.role,
+                  'x-user-email': userInfo?.email,
+                };
 
-        const response = await firstValueFrom(
-          this.httpService.request({
-            method: method.toLowerCase() as any,
-            url,
-            data,
-            headers: enhancedHeaders,
-            timeout: service.timeout,
-          })
-        );
+                const response = await firstValueFrom(
+                  this.httpService.request({
+                    method: method.toLowerCase() as any,
+                    url,
+                    data,
+                    headers: enhancedHeaders,
+                    timeout: service.timeout,
+                  })
+                );
 
-        if (method.toUpperCase() === "GET") {
-          this.cacheFallbackService.setCachedData(`${serviceName}:${method}:${path}`, response.data);
-        }
+                if (method.toUpperCase() === "GET") {
+                  this.cacheFallbackService.setCachedData(`${serviceName}:${method}:${path}`, response.data);
+                }
 
-        this.logger.log(`Successfully proxied request to ${url}`);
+                this.logger.log(`Successfully proxied request to ${url}`);
 
-        return response.data;
+                return response.data;
+              },
+              service.timeout,
+            );
+          }
+        )
       },
       `${serviceName}:${method}:${path}`,
       fallback,
