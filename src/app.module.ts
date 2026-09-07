@@ -9,18 +9,13 @@ import { LoggingMiddleware } from './middleware/logging/logging.middleware.js';
 import { MiddlewareModule } from './middleware/middleware.module.js';
 import { ProxyModule } from './proxy/proxy.module.js';
 import { CustomThrottlerGuard } from './guards/throttler.guard.js';
-
-export const { ObserveModule, ObserveInstrument } = createObserveModule();
+import { HealthModule } from './health/health.module.js';
+import { HealthCheckModule } from './common/health/health-check.module.js';
+import { FallbackModule } from './common/fallback/fallback.module.js';
+import { CircuitBreakerModule } from './common/circuit-breaker/circuit-breaker.module.js';
 
 @Module({
   imports: [
-    // Distributed tracing, auto-correlated logs, request/job metrics, error
-    // telemetry, alarms, and more — out of the box. Sign up at https://observe.nestjs.com
-    ObserveModule.forRoot({
-      appKey: 'YOUR_APP_KEY',
-      appSecret: 'YOUR_APP_SECRET',
-      serviceId: 'api-gateway',
-    }),
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => [
@@ -45,6 +40,10 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     ProxyModule,
     MiddlewareModule,
     AuthModule,
+    HealthModule,
+    HealthCheckModule,
+    FallbackModule,
+    CircuitBreakerModule,
   ],
   controllers: [AppController],
   providers: [

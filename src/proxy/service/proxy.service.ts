@@ -68,8 +68,8 @@ export class ProxyService {
         return response.data;
       },
       `${serviceName}:${method}:${path}`,
-      { failureThreshold: 3, timeout: 30000, resetTimeout: 30000 },
       fallback,
+      { failureThreshold: 3, timeout: 30000, resetTimeout: 30000 },
     );
   }
 
