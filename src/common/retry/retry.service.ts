@@ -62,4 +62,17 @@ export class RetryService {
 
     return delay;
   }
+
+  async executeWithExponentialBackoff<T>(
+    operation: () => Promise<T>,
+    maxRetries: number = 3,
+  ): Promise<T> {
+    const result = await this.executeWithRetry(operation, { maxRetries });
+
+    if (!result.success) {
+      throw result.error;
+    }
+
+    return result.data!;
+  }
 }
