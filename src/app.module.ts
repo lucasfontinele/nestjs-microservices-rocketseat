@@ -13,6 +13,8 @@ import { HealthModule } from './health/health.module.js';
 import { HealthCheckModule } from './common/health/health-check.module.js';
 import { FallbackModule } from './common/fallback/fallback.module.js';
 import { CircuitBreakerModule } from './common/circuit-breaker/circuit-breaker.module.js';
+import { TimeoutModule } from './common/timeout/timeout.module.js';
+import { RetryModule } from './common/retry/retry.module.js';
 
 @Module({
   imports: [
@@ -44,6 +46,8 @@ import { CircuitBreakerModule } from './common/circuit-breaker/circuit-breaker.m
     HealthCheckModule,
     FallbackModule,
     CircuitBreakerModule,
+    TimeoutModule,
+    RetryModule,
   ],
   controllers: [AppController],
   providers: [

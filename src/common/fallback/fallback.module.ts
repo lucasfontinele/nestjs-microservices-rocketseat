@@ -6,6 +6,4 @@ import { DefaultFallbackService } from "./default.fallback.js";
   providers: [CacheFallbackService, DefaultFallbackService],
   exports: [CacheFallbackService, DefaultFallbackService],
 })
-export class FallbackModule {
-  
-}
+export class FallbackModule {}
