@@ -1,0 +1,26 @@
+import { HttpModule } from '@nestjs/axios';
+import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { JwtModule } from '@nestjs/jwt';
+import { PassportModule } from '@nestjs/passport';
+import { AuthService } from './service/auth.service.js';
+import { AuthController } from './controllers/auth.controller.js';
+
+@Module({
+  imports: [
+    PassportModule,
+    HttpModule,
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      useFactory: async (configService: ConfigService) => ({
+        secret: configService.get<string>('JWT_SECRET'),
+        signOptions: { expiresIn: '1h' },
+      }),
+      inject: [ConfigService],
+    }),
+  ],
+  exports: [AuthService],
+  providers: [AuthService],
+  controllers: [AuthController],
+})
+export class AuthModule {}
