@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as amqp from 'amqplib';
+import { mergeScan } from 'rxjs';
 
 @Injectable()
 export class RabbitmqService implements OnModuleInit, OnModuleDestroy {
@@ -105,6 +106,51 @@ export class RabbitmqService implements OnModuleInit, OnModuleDestroy {
       this.logger.log(`✅ Message published to exchange "${exchange}" with routing key "${routingKey}"`);
     } catch (error) {
       this.logger.error('🚨 Failed to publish message', error);
+    }
+  }
+
+  public async subscribeToQueue(queueName: string, exchange: string, routingKey: string, onMessage: (msg: amqp.ConsumeMessage | null) => Promise<void>) {
+    try {
+      if (!this.channel) {
+        this.logger.warn('⚠️ RabbitMQ channel is not initialized. Message not subscribed.');
+
+        return;
+      }
+
+      await this.channel.assertExchange(exchange, 'topic', { durable: true });
+
+      const queue = await this.channel.assertQueue(queueName, { 
+        durable: true,
+        arguments: { 
+          'x-message-ttl': 86400000,
+          'x-max-lenght': 10000
+        } 
+      });
+
+      await this.channel.bindQueue(queueName, exchange, routingKey);
+
+      await this.channel.prefetch(1);
+
+      this.channel.consume(queue.queue, async (msg) => {
+        try {
+          if (msg) {
+            const message = JSON.parse(msg.content.toString())
+
+            this.logger.log(`📩 Received message from queue "${queueName}" with routing key "${routingKey}": ${JSON.stringify(message)}`);
+            this.logger.log(`📩 Message content: ${msg.content.toString()}`);
+
+            await onMessage(msg);
+
+            this.channel.ack(msg);
+
+            this.logger.log(`✅ Message from queue "${queueName}" with routing key "${routingKey}" processed successfully`);
+          }
+        } catch {
+          this.logger.error(`🚨 Failed to process message from queue "${queueName}" with routing key "${routingKey}"`);
+        }
+      }, { noAck: false });
+    } catch (error) {
+      this.logger.error('🚨 Failed to subscribe to queue', error);
     }
   }
 }
