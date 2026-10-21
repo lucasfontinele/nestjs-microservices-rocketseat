@@ -109,7 +109,7 @@ export class RabbitmqService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  public async subscribeToQueue(queueName: string, exchange: string, routingKey: string, onMessage: (msg: amqp.ConsumeMessage | null) => Promise<void>) {
+  public async subscribeToQueue(queueName: string, exchange: string, routingKey: string, onMessage: (msg: unknown | null) => Promise<void>) {
     try {
       if (!this.channel) {
         this.logger.warn('⚠️ RabbitMQ channel is not initialized. Message not subscribed.');
@@ -147,6 +147,7 @@ export class RabbitmqService implements OnModuleInit, OnModuleDestroy {
           }
         } catch {
           this.logger.error(`🚨 Failed to process message from queue "${queueName}" with routing key "${routingKey}"`);
+          this.channel.nack(msg as unknown as amqp.ConsumeMessage, false, false)
         }
       }, { noAck: false });
     } catch (error) {
